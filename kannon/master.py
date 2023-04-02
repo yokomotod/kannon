@@ -5,6 +5,7 @@ from typing import Deque, Dict, List, Set
 import logging
 
 import gokart
+from luigi.task import flatten
 from kubernetes import client
 
 from .task import TaskOnBullet
@@ -98,9 +99,11 @@ class Kannon:
             """Traversal task tree in post-order to push tasks into task queue."""
             nonlocal task_queue
             # run children
-            children = task.requires()
-            if isinstance(children, dict):
-                children = children.values()
+            if not isinstance(task, gokart.TaskOnKart):
+                raise RuntimeError(f"not TaskOnKart: {task}")
+
+            logger.info(f"{task}.requires()")
+            children = flatten(task.requires())
             for child in children:
                 _rec_enqueue_task(child)
 
@@ -179,9 +182,8 @@ class Kannon:
         return job
 
     def _is_executable(self, task: gokart.TaskOnKart) -> bool:
-        children = task.requires()
-        if isinstance(children, dict):
-            children = children.values()
+        logger.info(f"_is_executable: {task}.requires()")
+        children = flatten(task.requires())
 
         for child in children:
             if not child.complete():
